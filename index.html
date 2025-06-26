@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Granja Divertida</title>
+    <!-- Carga de Tailwind CSS para un diseño responsivo y moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define la fuente Inter, que es clara y legible */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow-x: hidden; /* Evita el scroll horizontal */
+        }
+        /* Estilo base para el contenedor del juego */
+        #game-container {
+            background: linear-gradient(to bottom right, #a7f3d0, #6ee7b7); /* Fondo degradado verde */
+            min-height: 100vh; /* Ocupa al menos el 100% de la altura de la ventana */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            box-sizing: border-box; /* Incluye padding en el ancho/alto */
+        }
+        /* Estilo para los elementos interactivos de animales */
+        .animal-card {
+            background-color: #fff;
+            border: 4px solid #fcd34d; /* Borde amarillo */
+            border-radius: 1.5rem; /* Esquinas más redondeadas */
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; /* Animación suave */
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); /* Sombra suave */
+            width: 150px; /* Ancho fijo para las tarjetas */
+            height: 180px; /* Alto fijo para las tarjetas */
+            text-align: center;
+        }
+        .animal-card:hover {
+            transform: translateY(-8px) scale(1.03); /* Efecto flotante al pasar el ratón */
+            box-shadow: 0 15px 20px rgba(0, 0, 0, 0.15); /* Sombra más pronunciada */
+        }
+        .animal-emoji {
+            font-size: 5rem; /* Tamaño grande para los emojis de animales */
+            line-height: 1; /* Elimina espacio extra de línea */
+        }
+        .animal-name {
+            font-size: 1.5rem; /* Tamaño de texto para el nombre del animal */
+            font-weight: 600; /* Negrita */
+            color: #3b82f6; /* Color azul para el nombre */
+            margin-top: 0.5rem;
+        }
+        /* Estilos para el texto de "sonido/nombre" simulado */
+        #simulated-audio-text {
+            position: absolute;
+            font-size: 6rem; /* Tamaño muy grande para la simulación de sonido */
+            font-weight: bold;
+            color: #8b5cf6; /* Color morado */
+            opacity: 0; /* Inicialmente oculto */
+            transition: opacity 0.3s ease-out; /* Transición de opacidad */
+            z-index: 20; /* Asegura que esté por encima de otros elementos */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); /* Sombra de texto */
+        }
+        #simulated-audio-text.visible {
+            opacity: 1; /* Visible cuando se activa */
+        }
+        /* Animación para el botón de siguiente cuando está habilitado */
+        #next-button:not([disabled]) {
+            animation: pulse 1.5s infinite; /* Animación de pulso */
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Nuevo estilo para la pista visual en la actividad 1 (resplandor pulsante) */
+        .animal-card.active-card-hint {
+            animation: activeGlow 1.5s infinite alternate; /* Resplandor pulsante */
+            border-color: #3b82f6; /* Borde azul para indicar interactividad */
+        }
+
+        @keyframes activeGlow {
+            0% { box-shadow: 0 0 0px 0px rgba(59, 130, 246, 0.7); }
+            100% { box-shadow: 0 0 15px 8px rgba(59, 130, 246, 0.7); }
+        }
+
+        /* Animación para el "tap" en la Actividad 1 */
+        .animal-card.tapped {
+            animation: tapEffect 0.3s ease-out;
+        }
+
+        @keyframes tapEffect {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container" class="relative min-h-screen flex flex-col items-center justify-center p-4 font-inter">
+        <!-- Título del juego -->
+        <h1 class="text-4xl md:text-5xl font-bold text-green-800 mb-8 drop-shadow-lg text-center">
+            La Granja Divertida 🚜
+        </h1>
+
+        <!-- Caja de mensajes/instrucciones -->
+        <div id="message-box" class="bg-blue-100 border-2 border-blue-400 text-blue-800 p-4 rounded-xl shadow-lg mb-6 text-center text-2xl md:text-3xl font-semibold w-full max-w-2xl">
+            <!-- Los mensajes aparecerán aquí -->
+        </div>
+
+        <!-- Área de visualización de sonido/nombre simulado -->
+        <div id="simulated-audio-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+
+        <!-- Área interactiva para animales y opciones -->
+        <div id="interactive-area" class="flex flex-wrap justify-center items-center gap-6 p-4 bg-yellow-100 rounded-3xl shadow-xl border-4 border-yellow-400 w-full max-w-5xl min-h-[300px] md:min-h-[400px]">
+            <!-- Los animales y las opciones se cargarán dinámicamente aquí -->
+        </div>
+
+        <!-- Visualización de recompensa (estrellas, confeti) -->
+        <div id="reward-display" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-7xl opacity-0 transition-opacity duration-500 ease-out z-10 pointer-events-none">
+            <!-- Las recompensas como ⭐ o 🎉 aparecerán aquí -->
+        </div>
+
+        <!-- Controles: Botones de Reiniciar y Siguiente -->
+        <div class="flex flex-row justify-center gap-4 mt-8 w-full max-w-xl">
+            <button id="reset-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 text-xl md:text-2xl flex items-center justify-center">
+                <span class="mr-2">🔄</span> Reiniciar
+            </button>
+            <button id="next-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 text-xl md:text-2xl opacity-50 cursor-not-allowed flex items-center justify-center" disabled>
+                Siguiente <span class="ml-2"▶️</span>
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        // Obtención de elementos del DOM
+        const messageBox = document.getElementById('message-box');
+        const interactiveArea = document.getElementById('interactive-area');
+        const rewardDisplay = document.getElementById('reward-display');
+        const resetButton = document.getElementById('reset-button');
+        const nextButton = document.getElementById('next-button');
+        const simulatedAudioText = document.getElementById('simulated-audio-text');
+
+        // Datos de los animales: nombre, emoji
+        const animalsData = [
+            { name: 'vaca', emoji: '🐄' },
+            { name: 'chancho', emoji: '🐖' },
+            { name: 'oveja', emoji: '🐑' },
+            { name: 'gallo', emoji: '🐓' },
+            { name: 'gato', emoji: '🐈' },
+            { name: 'caballo', emoji: '🐎' }
+        ];
+
+        // Estado del juego
+        let currentPage = 'welcome'; // 'welcome', 'activity1', 'activity2', 'activity3', 'completed'
+        let currentActivityIndex = 0; // Para seguir el progreso dentro de las actividades secuenciales
+        let correctAnswersInPhase = 0; // Contador de respuestas correctas en la fase actual
+        let shuffledAnimals = []; // Array para almacenar animales barajados para actividades
+
+        // Función para mezclar un array (Algoritmo Fisher-Yates)
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Función para mostrar mensajes en la caja de mensajes
+        function showMessage(text) {
+            messageBox.textContent = text;
+        }
+
+        // Función para simular un sonido/nombre mostrando texto (ya que no hay audio real)
+        async function playSimulatedSound(text) {
+            simulatedAudioText.textContent = text;
+            simulatedAudioText.classList.add('visible');
+            // Quita el texto después de un breve período
+            setTimeout(() => {
+                simulatedAudioText.classList.remove('visible');
+            }, 1500); // Muestra el texto por 1.5 segundos
+        }
+
+        // Función para obtener la onomatopeya de un animal usando la API de Gemini
+        async function getAnimalSoundOnomatopoeia(animalName) {
+            const prompt = `Genera solo la onomatopeya del sonido de una ${animalName} para que un niño de 3 años la 'escuche'. Sin explicaciones, solo el sonido.`;
+            const chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // La clave API será proporcionada por el entorno de Canvas
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    return result.candidates[0].content.parts[0].text.trim();
+                } else {
+                    console.error("Error al obtener onomatopeya:", result);
+                    return "Sonido no disponible";
+                }
+            } catch (error) {
+                console.error("Error en la llamada a la API de Gemini (onomatopeya):", error);
+                return "Error de sonido";
+            }
+        }
+
+        // Función para obtener el nombre del animal (simulando voz) usando la API de Gemini
+        async function getAnimalNameSpoken(animalName) {
+            const prompt = `Genera solo el nombre '${animalName}' para que un niño de 3 años lo 'escuche'. Sin explicaciones, solo el nombre.`;
+            const chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // La clave API será proporcionada por el entorno de Canvas
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    return result.candidates[0].content.parts[0].text.trim();
+                } else {
+                    console.error("Error al obtener nombre del animal:", result);
+                    return animalName; // Fallback al nombre de texto
+                }
+            } catch (error) {
+                console.error("Error en la llamada a la API de Gemini (nombre):", error);
+                return animalName; // Fallback al nombre de texto
+            }
+        }
+
+        // Función para mostrar una recompensa visual
+        function showReward(emoji) {
+            rewardDisplay.textContent = emoji;
+            rewardDisplay.style.opacity = '1';
+            rewardDisplay.style.transform = 'translate(-50%, -50%) scale(1)';
+            setTimeout(() => {
+                rewardDisplay.style.opacity = '0';
+                rewardDisplay.style.transform = 'translate(-50%, -50%) scale(0.5)';
+            }, 800); // Muestra la recompensa por 0.8 segundos
+        }
+
+        // Habilita o deshabilita el botón "Siguiente"
+        function enableNextButton(enabled) {
+            if (enabled) {
+                nextButton.disabled = false;
+                nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                nextButton.disabled = true;
+                nextButton.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // Renderiza las tarjetas de animales en el área interactiva
+        function renderAnimals(animalsToDisplay, clickable = true, addHint = false) {
+            interactiveArea.innerHTML = ''; // Limpia el área
+            animalsToDisplay.forEach(animal => {
+                const animalCard = document.createElement('div');
+                animalCard.classList.add('animal-card', 'rounded-xl', 'shadow-md', 'hover:shadow-lg', 'transition-all', 'duration-200');
+                animalCard.dataset.animalName = animal.name; // Almacena el nombre para referencia
+                if (clickable) {
+                    animalCard.classList.add('cursor-pointer');
+                } else {
+                    animalCard.classList.remove('cursor-pointer');
+                    animalCard.classList.add('pointer-events-none'); // Deshabilita clics
+                }
+
+                const emojiSpan = document.createElement('span');
+                emojiSpan.classList.add('animal-emoji');
+                emojiSpan.textContent = animal.emoji;
+
+                const nameSpan = document.createElement('span');
+                nameSpan.classList.add('animal-name');
+                nameSpan.textContent = animal.name.charAt(0).toUpperCase() + animal.name.slice(1); // Capitaliza el nombre
+
+                animalCard.appendChild(emojiSpan);
+                animalCard.appendChild(nameSpan);
+                interactiveArea.appendChild(animalCard);
+
+                if (addHint && clickable) { // Aplica la pista visual solo si es clickable y se solicita
+                    animalCard.classList.add('active-card-hint');
+                }
+            });
+        }
+
+        // --- Actividades del juego ---
+
+        // Pantalla de bienvenida
+        function startWelcomeScreen() {
+            currentPage = 'welcome';
+            showMessage('¡Bienvenido a La Granja Divertida! Toca "Siguiente" para empezar.');
+            interactiveArea.innerHTML = `
+                <div class="text-center text-gray-700 text-3xl font-semibold p-8">
+                    <p>¡Prepárate para conocer a nuestros amigos de la granja!</p>
+                    <span class="text-6xl mt-4 block">👋🐷🐔🐴🐑🐄</span>
+                    <p class="text-xl mt-4 text-blue-700 font-bold">NOTA: Los sonidos y voces se mostrarán como TEXTO en la pantalla.</p>
+                </div>
+            `;
+            enableNextButton(true); // Habilita el botón de siguiente para empezar
+        }
+
+        // Actividad 1: Reconocimiento visual y auditivo (Tocar para escuchar y ver nombre)
+        async function startActivity1() {
+            currentPage = 'activity1';
+            currentActivityIndex = 0;
+            correctAnswersInPhase = 0;
+            shuffledAnimals = shuffleArray([...animalsData]); // Mezcla los animales para la secuencia
+            enableNextButton(false); // Deshabilita hasta que la actividad se complete
+            displayAnimalForActivity1();
+        }
+
+        async function displayAnimalForActivity1() {
+            if (currentActivityIndex < shuffledAnimals.length) {
+                const animal = shuffledAnimals[currentActivityIndex];
+                // Instrucción más clara y directa para la actividad 1
+                showMessage(`¡Toca el/la ${animal.name} para ver su sonido y nombre!`);
+                // Renderiza el animal, es clickeable y añade la pista visual
+                renderAnimals([animal], true, true);
+
+                // Establece el manejador de clic para esta actividad
+                interactiveArea.onclick = async (event) => {
+                    const clickedCard = event.target.closest('.animal-card');
+                    // En Actividad 1, solo hay una tarjeta de animal, así que si se hizo clic en una tarjeta, es la correcta.
+                    if (clickedCard && clickedCard.dataset.animalName === animal.name) {
+                        clickedCard.classList.remove('active-card-hint'); // Quita la pista visual al hacer clic
+                        clickedCard.classList.add('tapped'); // Añade la clase para la animación de "tap"
+
+                        const soundText = await getAnimalSoundOnomatopoeia(animal.name);
+                        const nameText = await getAnimalNameSpoken(animal.name);
+                        await playSimulatedSound(`${soundText} (${nameText})`);
+                        showReward('⭐');
+
+                        // Espera a que la animación de "tap" termine antes de remover la clase y avanzar
+                        clickedCard.addEventListener('animationend', () => {
+                            clickedCard.classList.remove('tapped');
+                        }, { once: true }); // Asegura que el listener se ejecute solo una vez
+
+                        // Avanza al siguiente animal después de una pequeña pausa
+                        currentActivityIndex++;
+                        if (currentActivityIndex < shuffledAnimals.length) {
+                            setTimeout(displayAnimalForActivity1, 1000); // Pequeña pausa antes del siguiente
+                        } else {
+                            showMessage('¡Excelente! Has conocido a todos los animales. Toca "Siguiente".');
+                            enableNextButton(true);
+                            interactiveArea.onclick = null; // Deshabilita clics después de completar esta fase
+                        }
+                    }
+                };
+            } else {
+                // Esta rama se alcanza si ya se han mostrado todos los animales para tocar
+                showMessage('¡Excelente! Has conocido a todos los animales. Toca "Siguiente".');
+                enableNextButton(true);
+                interactiveArea.onclick = null;
+            }
+        }
+
+        // Actividad 2: Reconocimiento auditivo (Escuchar sonido y seleccionar animal)
+        async function startActivity2() {
+            currentPage = 'activity2';
+            currentActivityIndex = 0; // Reinicia para esta actividad
+            correctAnswersInPhase = 0;
+            shuffledAnimals = shuffleArray([...animalsData]); // Mezcla de nuevo para esta actividad
+            enableNextButton(false);
+            displayQuestionForActivity2();
+        }
+
+        async function displayQuestionForActivity2() {
+            if (currentActivityIndex < shuffledAnimals.length) {
+                const correctAnimal = shuffledAnimals[currentActivityIndex];
+                // Selecciona 2 animales incorrectos al azar que no sean el correcto
+                const incorrectAnimals = shuffleArray(animalsData.filter(a => a.name !== correctAnimal.name)).slice(0, 2);
+                const options = shuffleArray([...incorrectAnimals, correctAnimal]);
+
+                const soundText = await getAnimalSoundOnomatopoeia(correctAnimal.name);
+                showMessage(`Escucha este sonido: ${soundText}. ¿Qué animal lo hace?`);
+                playSimulatedSound(soundText); // Simula el sonido para que el niño lo "escuche"
+
+                renderAnimals(options, true); // Muestra las opciones, clickeables (sin pista visual activa)
+
+                interactiveArea.onclick = (event) => {
+                    const clickedCard = event.target.closest('.animal-card');
+                    if (clickedCard) {
+                        if (clickedCard.dataset.animalName === correctAnimal.name) {
+                            showReward('🎉');
+                            showMessage(`¡Sí! ¡Es la ${correctAnimal.name}!`);
+                            correctAnswersInPhase++;
+                            currentActivityIndex++;
+                            // Pequeña pausa antes de la siguiente pregunta
+                            setTimeout(displayQuestionForActivity2, 1200);
+                        } else {
+                            showMessage(`Ese no es el sonido. ¡Inténtalo de nuevo!`);
+                            showReward('❌'); // Muestra una "X" para incorrecto
+                        }
+                    }
+                };
+            } else {
+                showMessage('¡Muy bien! ¡Has reconocido todos los sonidos! Toca "Siguiente".');
+                enableNextButton(true);
+                interactiveArea.onclick = null;
+            }
+        }
+
+        // Actividad 3: Reconocimiento de nombre (Escuchar nombre y seleccionar animal)
+        async function startActivity3() {
+            currentPage = 'activity3';
+            currentActivityIndex = 0;
+            correctAnswersInPhase = 0;
+            shuffledAnimals = shuffleArray([...animalsData]);
+            enableNextButton(false);
+            displayQuestionForActivity3();
+        }
+
+        async function displayQuestionForActivity3() {
+            if (currentActivityIndex < shuffledAnimals.length) {
+                const correctAnimal = shuffledAnimals[currentActivityIndex];
+                const incorrectAnimals = shuffleArray(animalsData.filter(a => a.name !== correctAnimal.name)).slice(0, 2);
+                const options = shuffleArray([...incorrectAnimals, correctAnimal]);
+
+                const nameText = await getAnimalNameSpoken(correctAnimal.name);
+                showMessage(`¿Dónde está el/la ${nameText}?`);
+                playSimulatedSound(nameText); // Simula la voz para que el niño lo "escuche"
+
+                renderAnimals(options, true); // Muestra las opciones, clickeables
+
+                interactiveArea.onclick = (event) => {
+                    const clickedCard = event.target.closest('.animal-card');
+                    if (clickedCard) {
+                        if (clickedCard.dataset.animalName === correctAnimal.name) {
+                            showReward('🌟');
+                            showMessage(`¡Excelente! ¡Es el/la ${correctAnimal.name}!`);
+                            correctAnswersInPhase++;
+                            currentActivityIndex++;
+                            setTimeout(displayQuestionForActivity3, 1200);
+                        } else {
+                            showMessage(`Ese no es. ¡Inténtalo otra vez!`);
+                            showReward('🤔'); // Muestra un emoji de pensamiento para incorrecto
+                        }
+                    }
+                };
+            } else {
+                gameComplete();
+            }
+        }
+
+        // Juego completado
+        function gameComplete() {
+            currentPage = 'completed';
+            showMessage('¡Felicidades! ¡Has completado todas las actividades de la granja! 🎉');
+            interactiveArea.innerHTML = `
+                <div class="text-center text-green-700 text-3xl font-bold p-8">
+                    <p>¡Eres un granjero/a increíble!</p>
+                    <span class="text-6xl mt-4 block">🏆🥳🎊</span>
+                    <p class="text-xl mt-4">Toca "Reiniciar" para jugar de nuevo.</p>
+                </div>
+            `;
+            enableNextButton(false); // No hay más actividades
+            interactiveArea.onclick = null;
+        }
+
+        // Reinicia el juego al estado inicial
+        function resetGame() {
+            startWelcomeScreen();
+            enableNextButton(true); // Habilita el botón de siguiente para el inicio
+            currentActivityIndex = 0;
+            correctAnswersInPhase = 0;
+            shuffledAnimals = [];
+        }
+
+        // Manejador del botón "Siguiente"
+        function handleNext() {
+            switch (currentPage) {
+                case 'welcome':
+                    startActivity1();
+                    break;
+                case 'activity1':
+                    startActivity2();
+                    break;
+                case 'activity2':
+                    startActivity3();
+                    break;
+                case 'activity3':
+                    gameComplete();
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // Asigna los event listeners a los botones
+        resetButton.addEventListener('click', resetGame);
+        nextButton.addEventListener('click', handleNext);
+
+        // Inicializa el juego al cargar la página
+        document.addEventListener('DOMContentLoaded', initGame);
+
+        function initGame() {
+            // No se necesita Firebase para este juego de un solo jugador sin persistencia.
+            // Los valores __app_id, __firebase_config, __initial_auth_token se usarían si se integrara Firestore.
+            startWelcomeScreen();
+        }
+
+    </script>
+</body>
+</html>
